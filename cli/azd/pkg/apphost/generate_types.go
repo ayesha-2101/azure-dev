@@ -146,6 +146,9 @@ type genBicepTemplateContext struct {
 	HasLogAnalyticsWorkspace        bool
 	RequiresPrincipalId             bool
 	RequiresStorageVolume           bool
+	RequiresAppService              bool
+	RequiresAppServicePlan          bool
+	HasSidecar                      map[string]genSidecar
 	HasBindMounts                   bool
 	AppInsights                     map[string]genAppInsight
 	ServiceBuses                    map[string]genServiceBus
@@ -163,6 +166,21 @@ type genBicepTemplateContext struct {
 	BicepModules                    map[string]genBicepModules
 	// parameters to be passed from main.bicep to resources.bicep
 	mappedParameters []string
+}
+
+type genSidecar struct {
+	Name       string
+	Parent     string
+	Properties struct {
+		Image                string
+		TargetPort           string
+		IsMain               bool
+		AuthType             string
+		EnvironmentVariables []struct {
+			Name  string
+			Value string
+		}
+	}
 }
 
 type genContainerAppManifestTemplateContext struct {

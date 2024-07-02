@@ -467,6 +467,85 @@ resource {{bicepName $name}}Firewall 'firewallRules@2022-05-01-preview' = {
 output MANAGED_IDENTITY_CLIENT_ID string = managedIdentity.properties.clientId
 output MANAGED_IDENTITY_NAME string = managedIdentity.name
 output MANAGED_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
+output AZURE_WEBAPP_NAME string = webApp.id
+
+
+{{- if .RequiresAppServicePlan}}
+@description('App Service Plan name')
+@minLength(2)
+param appServicePlanName string = 'AppServicePlan-${webAppName}'
+@description('App Service Plan SKU')
+@minLength(2)
+param sku string = 'F1'
+
+resource {{bicepName $name}}AppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
+	name: appServicePlanName
+	location: location
+	sku: {
+	  name: sku
+	}
+	kind: 'linux'
+	properties: {
+	  reserved: true
+	}
+  }
+  
+{{end -}}
+
+
+{{- if .RequiresAppService }}
+@description('Web app name')
+@minLength(2)
+param webAppName string = 'aspireapp-${uniqueString(resourceGroup().id)}'
+resource {{bicepName webAppName}} 'Microsoft.Web/serverfarms@2021-02-01' = {
+	name: webAppName
+	location: location
+	properties: {
+		httpsOnly: true
+		serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: 'sitecontainers'
+      minTlsVersion: '1.2'
+      ftpsState: 'FtpsOnly'
+      appSettings: [
+      {
+        name: 'ConnectionStrings__cache'
+        value: 'localhost:6379'
+      }
+      {
+        name: 'DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS'
+        value: 'true'
+      }
+      {
+        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES'
+        value: 'true'
+      }
+      {
+        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EXCEPTION_LOG_ATTRIBUTES'
+        value: 'true'
+      }
+      {
+        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY'
+        value: 'true'
+      }
+      {
+        name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
+        value: 'http://localhost:18889'
+      }
+      {
+        name: 'services__apiservice__http__0'
+        value: 'http://localhost:8888'
+      }
+      ]
+    }
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+}
+
+{{end -}}
+
 {{if .HasLogAnalyticsWorkspace -}}
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = logAnalyticsWorkspace.name
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = logAnalyticsWorkspace.id

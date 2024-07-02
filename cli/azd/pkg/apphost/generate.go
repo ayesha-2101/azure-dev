@@ -94,6 +94,7 @@ func init() {
 		).
 		ParseFS(resources.AppHostTemplates, "apphost/templates/*")
 	if err != nil {
+		fmt.Println("Error:", err)
 		panic("failed to parse generator templates: " + err.Error())
 	}
 
