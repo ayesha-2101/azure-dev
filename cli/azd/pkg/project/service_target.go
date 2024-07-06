@@ -25,7 +25,7 @@ const (
 	StaticWebAppTarget       ServiceTargetKind = "staticwebapp"
 	SpringAppTarget          ServiceTargetKind = "springapp"
 	AksTarget                ServiceTargetKind = "aks"
-	DotNetContainerAppTarget ServiceTargetKind = "containerapp-dotnet"
+	DotNetContainerAppTarget ServiceTargetKind = "appservice-dotnet"
 	AiEndpointTarget         ServiceTargetKind = "ai.endpoint"
 )
 

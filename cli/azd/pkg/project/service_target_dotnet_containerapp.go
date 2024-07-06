@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -17,7 +19,8 @@ import (
 	"github.com/azure/azure-dev/cli/azd/pkg/alpha"
 	"github.com/azure/azure-dev/cli/azd/pkg/apphost"
 	"github.com/azure/azure-dev/cli/azd/pkg/async"
-	"github.com/azure/azure-dev/cli/azd/pkg/azure"
+
+	// "github.com/azure/azure-dev/cli/azd/pkg/azure"
 	"github.com/azure/azure-dev/cli/azd/pkg/containerapps"
 	"github.com/azure/azure-dev/cli/azd/pkg/cosmosdb"
 	"github.com/azure/azure-dev/cli/azd/pkg/environment"
@@ -26,6 +29,8 @@ import (
 	"github.com/azure/azure-dev/cli/azd/pkg/sqldb"
 	"github.com/azure/azure-dev/cli/azd/pkg/tools"
 	"github.com/azure/azure-dev/cli/azd/pkg/tools/dotnet"
+	"github.com/azure/azure-dev/cli/azd/pkg/tools/requesthelper"
+ 
 )
 
 type dotnetContainerAppTarget struct {
@@ -237,6 +242,7 @@ func (at *dotnetContainerAppTarget) Deploy(
 					"targetPortOrDefault": func(targetPortFromManifest int) int {
 						// portNumber is 0 for dockerfile.v0, so we use the targetPort from the manifest
 						if portNumber == 0 {
+							portNumber = targetPortFromManifest
 							return targetPortFromManifest
 						}
 						return portNumber
@@ -272,42 +278,39 @@ func (at *dotnetContainerAppTarget) Deploy(
 				return
 			}
 
-			err = at.containerAppService.DeployYaml(
-				ctx,
-				targetResource.SubscriptionId(),
-				targetResource.ResourceGroupName(),
-				serviceConfig.Name,
-				[]byte(builder.String()),
-			)
+			parsedTemplate := builder.String()
+			re := regexp.MustCompile(`targetPort:\s*(\d+)`)
+			matches := re.FindStringSubmatch(parsedTemplate)
+			portNumber, err = strconv.Atoi(matches[1])
+			siteName := at.env.Getenv("AZURE_APPSERVICE_ENVIRONMENT_ID")
+			containerName := serviceConfig.Name
+
+			isMain := false
+			if containerName == "frontend" {
+				isMain = true
+			}
+			url := fmt.Sprintf("https://management.azure.com%s/sitecontainers/%s?api-version=2014-11-01", siteName, containerName)
+			jsonData := fmt.Sprintf(`{
+					"properties": 
+					{
+						"image": "%s",
+						"targetPort": "%d",
+						"isMain": "%t"
+					}
+					}`, remoteImageName, portNumber, isMain)
+			
+			res, err := requesthelper.SendRawARMRequest(ctx, "PUT", url, jsonData)
+			
 			if err != nil {
-				task.SetError(fmt.Errorf("updating container app service: %w", err))
+				fmt.Println("Error sending request:", err)
+				return
+			}
+			if res.StatusCode != 200 || res.StatusCode != 202 {
+				fmt.Println("Error sending request:", res.StatusCode)
 				return
 			}
 
-			task.SetProgress(NewServiceProgress("Fetching endpoints for container app service"))
-
-			containerAppTarget := environment.NewTargetResource(
-				targetResource.SubscriptionId(),
-				targetResource.ResourceGroupName(),
-				serviceConfig.Name,
-				string(infra.AzureResourceTypeContainerApp))
-
-			endpoints, err := at.Endpoints(ctx, serviceConfig, containerAppTarget)
-			if err != nil {
-				task.SetError(err)
-				return
-			}
-
-			task.SetResult(&ServiceDeployResult{
-				Package: packageOutput,
-				TargetResourceId: azure.ContainerAppRID(
-					targetResource.SubscriptionId(),
-					targetResource.ResourceGroupName(),
-					serviceConfig.Name,
-				),
-				Kind:      ContainerAppTarget,
-				Endpoints: endpoints,
-			})
+			defer res.Body.Close()
 		},
 	)
 }

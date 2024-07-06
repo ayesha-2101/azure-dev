@@ -60,9 +60,9 @@ func (im *ImportManager) ServiceStable(ctx context.Context, projectConfig *Proje
 					return nil, errNoMultipleServicesWithAppHost
 				}
 
-				if svcConfig.Host != ContainerAppTarget {
-					return nil, errAppHostMustTargetContainerApp
-				}
+				// if svcConfig.Host != ContainerAppTarget {
+				// 	return nil, errAppHostMustTargetContainerApp
+				// }
 
 				services, err := im.dotNetImporter.Services(ctx, projectConfig, svcConfig)
 				if err != nil {

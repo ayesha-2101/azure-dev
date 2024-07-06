@@ -464,21 +464,12 @@ resource {{bicepName $name}}Firewall 'firewallRules@2022-05-01-preview' = {
 {{end -}}
 }
 {{end -}}
-output MANAGED_IDENTITY_CLIENT_ID string = managedIdentity.properties.clientId
-output MANAGED_IDENTITY_NAME string = managedIdentity.name
-output MANAGED_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
-output AZURE_WEBAPP_NAME string = webApp.id
 
-
-{{- if .RequiresAppServicePlan}}
-@description('App Service Plan name')
-@minLength(2)
 param appServicePlanName string = 'AppServicePlan-${webAppName}'
-@description('App Service Plan SKU')
-@minLength(2)
-param sku string = 'F1'
+param sku string = 'B1'
+param webAppName string = 'aspireapp-${uniqueString(resourceGroup().id)}'
 
-resource {{bicepName $name}}AppServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2021-02-01' = {
 	name: appServicePlanName
 	location: location
 	sku: {
@@ -488,63 +479,35 @@ resource {{bicepName $name}}AppServicePlan 'Microsoft.Web/serverfarms@2021-02-01
 	properties: {
 	  reserved: true
 	}
+  tags: tags
   }
-  
-{{end -}}
 
-
-{{- if .RequiresAppService }}
-@description('Web app name')
-@minLength(2)
-param webAppName string = 'aspireapp-${uniqueString(resourceGroup().id)}'
-resource {{bicepName webAppName}} 'Microsoft.Web/serverfarms@2021-02-01' = {
+resource appService 'Microsoft.Web/sites@2022-09-01'= {
 	name: webAppName
 	location: location
 	properties: {
-		httpsOnly: true
+    httpsOnly: true
 		serverFarmId: appServicePlan.id
     siteConfig: {
       linuxFxVersion: 'sitecontainers'
       minTlsVersion: '1.2'
       ftpsState: 'FtpsOnly'
-      appSettings: [
-      {
-        name: 'ConnectionStrings__cache'
-        value: 'localhost:6379'
-      }
-      {
-        name: 'DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS'
-        value: 'true'
-      }
-      {
-        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES'
-        value: 'true'
-      }
-      {
-        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EXCEPTION_LOG_ATTRIBUTES'
-        value: 'true'
-      }
-      {
-        name: 'OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY'
-        value: 'true'
-      }
-      {
-        name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-        value: 'http://localhost:18889'
-      }
-      {
-        name: 'services__apiservice__http__0'
-        value: 'http://localhost:8888'
-      }
-      ]
     }
   }
+  tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentity.id}': {}
+    }
   }
 }
 
-{{end -}}
+output MANAGED_IDENTITY_CLIENT_ID string = managedIdentity.properties.clientId
+output MANAGED_IDENTITY_NAME string = managedIdentity.name
+output MANAGED_IDENTITY_PRINCIPAL_ID string = managedIdentity.properties.principalId
+output AZURE_APPSERVICE_ENVIRONMENT_ID string = appService.id
+
 
 {{if .HasLogAnalyticsWorkspace -}}
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = logAnalyticsWorkspace.name
@@ -559,6 +522,7 @@ output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = containerAppEnvironment.na
 output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = containerAppEnvironment.id
 output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = containerAppEnvironment.properties.defaultDomain
 {{end -}}
+
 {{range $name, $value := .ContainerApps -}}
 {{range $volume := $value.Volumes -}}
 output SERVICE_{{alphaSnakeUpper $name}}_VOLUME_{{removeDot $volume.Name | alphaSnakeUpper}}_NAME string = {{mergeBicepName $name $volume.Name}}Store.name
@@ -601,4 +565,4 @@ output SERVICE_BINDING_{{alphaSnakeUpper $name}}_NAME string = {{bicepName $name
 {{if .RequiresStorageVolume -}}
 output AZURE_VOLUMES_STORAGE_ACCOUNT string = storageVolume.name
 {{ end -}}
-{{ end}}
+{{ end -}}

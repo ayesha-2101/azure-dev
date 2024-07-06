@@ -22,12 +22,35 @@ type detectConfirmAppHost struct {
 	root string
 
 	// internal state and components
-	console input.Console
+	console       input.Console
+	UserSelection int
 }
 
 // Init initializes state from initial detection output
 func (d *detectConfirmAppHost) Init(appHost appdetect.Project, root string) {
-	d.AppHost = appHost
+	fmt.Println("Select the App Host:")
+	fmt.Println("1. App Services")
+	fmt.Println("2. Container Apps")
+
+	var selection int
+	_, err := fmt.Scan(&selection)
+	if err != nil {
+		fmt.Println("Error reading selection:", err)
+		return
+	}
+
+	switch selection {
+	case 1:
+		d.AppHost = appHost
+		d.UserSelection = selection
+	case 2:
+		d.AppHost = appHost
+		d.UserSelection = selection
+	default:
+		fmt.Println("Invalid selection. Defaulting to App Services.")
+		d.AppHost = appHost
+		d.UserSelection = 1
+	}
 
 	d.captureUsage(
 		fields.AppInitDetectedServices)
@@ -77,12 +100,20 @@ func (d *detectConfirmAppHost) render(ctx context.Context) error {
 	d.console.Message(ctx, "  "+color.BlueString(projectDisplayName(d.AppHost)))
 	d.console.Message(ctx, "  "+"Detected in: "+output.WithHighLightFormat(relSafe(d.root, d.AppHost.Path)))
 	d.console.Message(ctx, "")
-	d.console.Message(
-		ctx,
-		"azd will generate the files necessary to host your app on Azure using "+color.MagentaString(
-			"Azure Container Apps",
-		)+".\n",
-	)
-
+	if d.UserSelection == 1 {
+		d.console.Message(
+			ctx,
+			"azd will generate the files necessary to host your app on Azure using "+color.MagentaString(
+				"Azure App Service",
+			)+".\n",
+		)
+	} else if d.UserSelection == 2 {
+		d.console.Message(
+			ctx,
+			"azd will generate the files necessary to host your app on Azure using "+color.MagentaString(
+				"Azure Container Apps",
+			)+".\n",
+		)
+	}
 	return nil
 }

@@ -198,7 +198,7 @@ func (d *detectConfirm) render(ctx context.Context) error {
 		d.console.Message(ctx, "")
 
 		if len(recommendedServices) == 0 {
-			recommendedServices = append(recommendedServices, "Azure Container Apps")
+			recommendedServices = append(recommendedServices, "Azure App Service")
 		}
 	}
 
@@ -209,7 +209,7 @@ func (d *detectConfirm) render(ctx context.Context) error {
 		case appdetect.DbMongo:
 			recommendedServices = append(recommendedServices, "Azure CosmosDB API for MongoDB")
 		case appdetect.DbRedis:
-			recommendedServices = append(recommendedServices, "Azure Container Apps Redis add-on")
+			recommendedServices = append(recommendedServices, "Azure App Service Redis add-on")
 		}
 
 		status := ""

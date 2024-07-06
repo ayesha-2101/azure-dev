@@ -111,6 +111,10 @@ func (s *environmentService) loadEnvironmentAsync(
 		ret.Properties["LogAnalyticsWorkspace"] = v
 	}
 
+	if v := e.Getenv("AZURE_APPSERVICE_ENVIRONMENT_ID"); v != "" {
+		ret.Properties["AppServiceEnvironment"] = v
+	}
+
 	// If we would have to discover the app host or load the manifest from disk and the caller did not request it
 	// skip this somewhat expensive operation, at the expense of not building out the services array.
 	if !mustLoadServices {
