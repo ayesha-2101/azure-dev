@@ -20,7 +20,7 @@ import (
 	"github.com/azure/azure-dev/cli/azd/pkg/apphost"
 	"github.com/azure/azure-dev/cli/azd/pkg/async"
 
-	// "github.com/azure/azure-dev/cli/azd/pkg/azure"
+	"github.com/azure/azure-dev/cli/azd/pkg/azure"
 	"github.com/azure/azure-dev/cli/azd/pkg/containerapps"
 	"github.com/azure/azure-dev/cli/azd/pkg/cosmosdb"
 	"github.com/azure/azure-dev/cli/azd/pkg/environment"
@@ -278,6 +278,19 @@ func (at *dotnetContainerAppTarget) Deploy(
 				return
 			}
 
+			err = at.containerAppService.DeployYaml(
+				ctx,
+				targetResource.SubscriptionId(),
+				targetResource.ResourceGroupName(),
+				serviceConfig.Name,
+				[]byte(builder.String()),
+			)
+			if err != nil {
+				task.SetError(fmt.Errorf("updating container app service: %w", err))
+				return
+			}
+
+			task.SetProgress(NewServiceProgress("Adding sidecar container for service"))
 			parsedTemplate := builder.String()
 			re := regexp.MustCompile(`targetPort:\s*(\d+)`)
 			matches := re.FindStringSubmatch(parsedTemplate)
@@ -286,7 +299,7 @@ func (at *dotnetContainerAppTarget) Deploy(
 			containerName := serviceConfig.Name
 
 			isMain := false
-			if containerName == "frontend" {
+			if containerName != "cache" {
 				isMain = true
 			}
 			url := fmt.Sprintf("https://management.azure.com%s/sitecontainers/%s?api-version=2014-11-01", siteName, containerName)
@@ -298,19 +311,41 @@ func (at *dotnetContainerAppTarget) Deploy(
 						"isMain": "%t"
 					}
 					}`, remoteImageName, portNumber, isMain)
-			
+
 			res, err := requesthelper.SendRawARMRequest(ctx, "PUT", url, jsonData)
-			
+
 			if err != nil {
 				fmt.Println("Error sending request:", err)
 				return
 			}
-			if res.StatusCode != 200 || res.StatusCode != 202 {
+			if res.StatusCode != 200 && res.StatusCode != 202 {
 				fmt.Println("Error sending request:", res.StatusCode)
 				return
 			}
 
 			defer res.Body.Close()
+			containerAppTarget := environment.NewTargetResource(
+				targetResource.SubscriptionId(),
+				targetResource.ResourceGroupName(),
+				serviceConfig.Name,
+				string(infra.AzureResourceTypeContainerApp))
+
+			endpoints, err := at.Endpoints(ctx, serviceConfig, containerAppTarget)
+			if err != nil {
+				task.SetError(err)
+				return
+			}
+
+			task.SetResult(&ServiceDeployResult{
+				Package: packageOutput,
+				TargetResourceId: azure.ContainerAppRID(
+					targetResource.SubscriptionId(),
+					targetResource.ResourceGroupName(),
+					serviceConfig.Name,
+				),
+				Kind:      ContainerAppTarget,
+				Endpoints: endpoints,
+			})
 		},
 	)
 }

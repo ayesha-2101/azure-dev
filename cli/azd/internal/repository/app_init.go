@@ -41,7 +41,7 @@ var dbMap = map[appdetect.DatabaseDep]struct{}{
 func (i *Initializer) InitFromApp(
 	ctx context.Context,
 	azdCtx *azdcontext.AzdContext,
-	initializeEnv func() (*environment.Environment, error)) error {
+	initializeEnv func() (*environment.Environment, error)) (ServiceTargetKind, error) {
 	i.console.Message(ctx, "")
 	title := "Scanning app code in current directory"
 	i.console.ShowSpinner(ctx, title, input.Step)
@@ -68,7 +68,7 @@ func (i *Initializer) InitFromApp(
 			false))
 		if err != nil {
 			i.console.StopSpinner(ctx, title, input.GetStepResultFormat(err))
-			return err
+			return "", err
 		}
 
 		projects = prj
@@ -86,7 +86,7 @@ func (i *Initializer) InitFromApp(
 
 		manifest, err := apphost.ManifestFromAppHost(ctx, prj.Path, i.dotnetCli, "")
 		if err != nil {
-			return fmt.Errorf("failed to generate manifest from app host project: %w", err)
+			return "", fmt.Errorf("failed to generate manifest from app host project: %w", err)
 		}
 		appHostManifests[prj.Path] = manifest
 		for _, path := range apphost.ProjectPaths(manifest) {
@@ -125,7 +125,7 @@ func (i *Initializer) InitFromApp(
 			rel, _ := filepath.Rel(wd, appHost.Path)
 			relPaths = append(relPaths, rel)
 		}
-		return fmt.Errorf(
+		return "", fmt.Errorf(
 			"found multiple Aspire app host projects: %s. To fix, rerun `azd init` in each app host project directory",
 			ux.ListAsText(relPaths))
 	}
@@ -152,8 +152,10 @@ func (i *Initializer) InitFromApp(
 		detect := detectConfirmAppHost{console: i.console}
 		detect.Init(appHost, wd)
 
-		if err := detect.Confirm(ctx); err != nil {
-			return err
+		
+
+		if targetService, err := detect.Confirm(ctx); err != nil {
+			return targetService, err
 		}
 
 		tracing.SetUsageAttributes(fields.AppInitLastStep.String("config"))
@@ -161,14 +163,14 @@ func (i *Initializer) InitFromApp(
 		// Prompt for environment before proceeding with generation
 		newEnv, err := initializeEnv()
 		if err != nil {
-			return err
+			return "", err
 		}
 		envManager, err := i.lazyEnvManager.GetValue()
 		if err != nil {
-			return err
+			return "", err
 		}
 		if err := envManager.Save(ctx, newEnv); err != nil {
-			return err
+			return "", err
 		}
 
 		i.console.Message(ctx, "\n"+output.WithBold("Generating files to run your app on Azure:")+"\n")
@@ -181,28 +183,28 @@ func (i *Initializer) InitFromApp(
 			appHost.Path,
 		)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		staging, err := os.MkdirTemp("", "azd-infra")
 		if err != nil {
-			return fmt.Errorf("mkdir temp: %w", err)
+			return "",fmt.Errorf("mkdir temp: %w", err)
 		}
 
 		defer func() { _ = os.RemoveAll(staging) }()
 		for path, file := range files {
 			if err := os.MkdirAll(filepath.Join(staging, filepath.Dir(path)), osutil.PermissionDirectory); err != nil {
-				return err
+				return "", err
 			}
 
 			if err := os.WriteFile(filepath.Join(staging, path), []byte(file.Contents), file.Mode); err != nil {
-				return err
+				return "", err
 			}
 		}
 
 		skipStagingFiles, err := i.promptForDuplicates(ctx, staging, azdCtx.ProjectDirectory())
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		options := copy.Options{}
@@ -214,7 +216,7 @@ func (i *Initializer) InitFromApp(
 		}
 
 		if err := copy.Copy(staging, azdCtx.ProjectDirectory(), options); err != nil {
-			return fmt.Errorf("copying contents from temp staging directory: %w", err)
+			return "", fmt.Errorf("copying contents from temp staging directory: %w", err)
 		}
 
 		i.console.MessageUxItem(ctx, &ux.DoneMessage{
@@ -225,7 +227,7 @@ func (i *Initializer) InitFromApp(
 			Message: "Generating " + output.WithHighLightFormat("./next-steps.md"),
 		})
 
-		return i.writeCoreAssets(ctx, azdCtx)
+		return targetService, i.writeCoreAssets(ctx, azdCtx)
 	}
 
 	detect := detectConfirm{console: i.console}
@@ -311,7 +313,7 @@ func (i *Initializer) InitFromApp(
 		Message: "Generating " + output.WithHighLightFormat("./next-steps.md"),
 	})
 
-	return nil
+	return targetService ,nil
 }
 
 func (i *Initializer) genProjectFile(

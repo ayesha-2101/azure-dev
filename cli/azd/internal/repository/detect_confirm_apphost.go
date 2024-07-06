@@ -13,6 +13,20 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+type ServiceTargetKind string
+
+const (
+	NonSpecifiedTarget       ServiceTargetKind = ""
+	AppServiceTarget         ServiceTargetKind = "appservice"
+	ContainerAppTarget       ServiceTargetKind = "containerapp"
+	AzureFunctionTarget      ServiceTargetKind = "function"
+	StaticWebAppTarget       ServiceTargetKind = "staticwebapp"
+	SpringAppTarget          ServiceTargetKind = "springapp"
+	AksTarget                ServiceTargetKind = "aks"
+	DotNetContainerAppTarget ServiceTargetKind = "appservice-dotnet"
+	AiEndpointTarget         ServiceTargetKind = "ai.endpoint"
+)
+
 // detectConfirmAppHost handles prompting for confirming the detected project with an app host.
 type detectConfirmAppHost struct {
 	// The app host we found
@@ -23,12 +37,12 @@ type detectConfirmAppHost struct {
 
 	// internal state and components
 	console       input.Console
-	UserSelection int
+	targetService ServiceTargetKind
 }
 
 // Init initializes state from initial detection output
 func (d *detectConfirmAppHost) Init(appHost appdetect.Project, root string) {
-	fmt.Println("Select the App Host:")
+	fmt.Println("Select the target service for running aspire app:")
 	fmt.Println("1. App Services")
 	fmt.Println("2. Container Apps")
 
@@ -42,14 +56,14 @@ func (d *detectConfirmAppHost) Init(appHost appdetect.Project, root string) {
 	switch selection {
 	case 1:
 		d.AppHost = appHost
-		d.UserSelection = selection
+		d.targetService = AppServiceTarget
 	case 2:
 		d.AppHost = appHost
-		d.UserSelection = selection
+		d.targetService = ContainerAppTarget
 	default:
 		fmt.Println("Invalid selection. Defaulting to App Services.")
 		d.AppHost = appHost
-		d.UserSelection = 1
+		d.targetService = AppServiceTarget
 	}
 
 	d.captureUsage(
@@ -66,10 +80,10 @@ func (d *detectConfirmAppHost) captureUsage(
 
 // Confirm prompts the user to confirm the detected services and databases,
 // providing modifications to the detected services and databases.
-func (d *detectConfirmAppHost) Confirm(ctx context.Context) error {
+func (d *detectConfirmAppHost) Confirm(ctx context.Context) (ServiceTargetKind, error) {
 	for {
 		if err := d.render(ctx); err != nil {
-			return err
+			return "", err
 		}
 
 		continueOption, err := d.console.Select(ctx, input.ConsoleOptions{
@@ -80,16 +94,16 @@ func (d *detectConfirmAppHost) Confirm(ctx context.Context) error {
 			},
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		switch continueOption {
 		case 0:
 			d.captureUsage(
 				fields.AppInitConfirmedServices)
-			return nil
+			return d.targetService, nil
 		case 1:
-			return fmt.Errorf("cancelled due to user input")
+			return "", fmt.Errorf("cancelled due to user input")
 		}
 	}
 }
@@ -100,14 +114,14 @@ func (d *detectConfirmAppHost) render(ctx context.Context) error {
 	d.console.Message(ctx, "  "+color.BlueString(projectDisplayName(d.AppHost)))
 	d.console.Message(ctx, "  "+"Detected in: "+output.WithHighLightFormat(relSafe(d.root, d.AppHost.Path)))
 	d.console.Message(ctx, "")
-	if d.UserSelection == 1 {
+	if d.targetService == "appservice" {
 		d.console.Message(
 			ctx,
 			"azd will generate the files necessary to host your app on Azure using "+color.MagentaString(
 				"Azure App Service",
 			)+".\n",
 		)
-	} else if d.UserSelection == 2 {
+	} else if d.targetService == "containerapp" {
 		d.console.Message(
 			ctx,
 			"azd will generate the files necessary to host your app on Azure using "+color.MagentaString(
