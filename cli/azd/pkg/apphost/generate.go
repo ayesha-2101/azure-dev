@@ -370,6 +370,7 @@ func GenerateProjectArtifacts(
 	projectName string,
 	manifest *Manifest,
 	appHostProject string,
+	targetService string,
 ) (map[string]ContentsAndMode, error) {
 	appHostRel, err := filepath.Rel(projectDir, appHostProject)
 	if err != nil {
@@ -383,6 +384,7 @@ func GenerateProjectArtifacts(
 		Services: map[string]string{
 			"app": fmt.Sprintf(".%s%s", string(filepath.Separator), appHostRel),
 		},
+		TargetService: targetService,
 	}
 
 	if err := executeToFS(generatedFS, genTemplates, "azure.yaml", "azure.yaml", projectFileContext); err != nil {
@@ -441,6 +443,9 @@ type infraGenerator struct {
 	containerAppTemplateContexts map[string]genContainerAppManifestTemplateContext
 	allServicesIngress           map[string]ingressDetails
 	buildContainers              map[string]genBuildContainer
+
+	// redisHost     string
+	// redisPassword string
 }
 
 func newInfraGenerator() *infraGenerator {
@@ -1143,6 +1148,8 @@ func (b *infraGenerator) addDaprRedisComponent(componentName string, componentTy
 	}
 
 	b.bicepContext.DaprComponents[componentName] = component
+
+	// b.redisHost, b.redisPassword = redisHost, redisPassword
 }
 
 func (b *infraGenerator) addDaprPubSubComponent(name string) {

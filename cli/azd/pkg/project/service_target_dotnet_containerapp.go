@@ -30,7 +30,6 @@ import (
 	"github.com/azure/azure-dev/cli/azd/pkg/tools"
 	"github.com/azure/azure-dev/cli/azd/pkg/tools/dotnet"
 	"github.com/azure/azure-dev/cli/azd/pkg/tools/requesthelper"
- 
 )
 
 type dotnetContainerAppTarget struct {
@@ -179,7 +178,7 @@ func (at *dotnetContainerAppTarget) Deploy(
 				remoteImageName = fmt.Sprintf("%s/%s", dockerCreds.LoginServer, imageName)
 			}
 
-			task.SetProgress(NewServiceProgress("Updating container app"))
+			task.SetProgress(NewServiceProgress("Updating container for appservice"))
 
 			var manifest string
 
@@ -290,7 +289,7 @@ func (at *dotnetContainerAppTarget) Deploy(
 				return
 			}
 
-			task.SetProgress(NewServiceProgress("Adding sidecar container for service"))
+			task.SetProgress(NewServiceProgress("Adding sidecar container for appservice"))
 			parsedTemplate := builder.String()
 			re := regexp.MustCompile(`targetPort:\s*(\d+)`)
 			matches := re.FindStringSubmatch(parsedTemplate)
@@ -302,13 +301,31 @@ func (at *dotnetContainerAppTarget) Deploy(
 			if containerName != "cache" {
 				isMain = true
 			}
+			// var environmentVars string
+			// if serviceConfig.Name == "cache" {
+			// 	environmentVars = fmt.Sprintf(`,"environmentVariables": [
+			// 		{
+			// 			"name": "REDIS_CONNECTION_STRING",
+			// 			"value": "redis://%s@%s:6379/0"
+			// 		}
+			// 	]`, b.redisPassword, b.redisHost)
+			// } else {
+			// 	environmentVars = ""
+			// }
 			url := fmt.Sprintf("https://management.azure.com%s/sitecontainers/%s?api-version=2014-11-01", siteName, containerName)
 			jsonData := fmt.Sprintf(`{
 					"properties": 
 					{
 						"image": "%s",
 						"targetPort": "%d",
-						"isMain": "%t"
+						"isMain": "%t",
+						"environmentVariables": [
+							{
+								"name": "ConnectionStrings__cache",
+								"value": "cache:6379"
+							}
+						]
+
 					}
 					}`, remoteImageName, portNumber, isMain)
 

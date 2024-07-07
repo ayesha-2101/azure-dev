@@ -241,6 +241,8 @@ func (i *initAction) Run(ctx context.Context) (*actions.ActionResult, error) {
 		targetService, err := i.repoInitializer.InitFromApp(ctx, azdCtx, func() (*environment.Environment, error) {
 			return i.initializeEnv(ctx, azdCtx, nil)
 		})
+		fmt.Println("targetService:", targetService)
+
 		if err != nil {
 			return nil, err
 		}

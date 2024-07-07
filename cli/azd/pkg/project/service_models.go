@@ -112,23 +112,23 @@ func (spr *ServiceDeployResult) ToString(currentIndentation string) string {
 
 	builder := strings.Builder{}
 
-	if len(spr.Endpoints) == 0 {
-		builder.WriteString(fmt.Sprintf("%s- No endpoints were found\n", currentIndentation))
-	} else {
-		for _, endpoint := range spr.Endpoints {
-			label := "Endpoint"
-			url := endpoint
+	// if len(spr.Endpoints) == 0 {
+	// 	builder.WriteString(fmt.Sprintf("%s- No endpoints were found\n", currentIndentation))
+	// } else {
+	// 	for _, endpoint := range spr.Endpoints {
+	// 		label := "Endpoint"
+	// 		url := endpoint
 
-			// When the endpoint pattern is matched used the first sub match as the endpoint label.
-			matches := endpointPattern.FindStringSubmatch(endpoint)
-			if len(matches) == 3 {
-				label = matches[1]
-				url = matches[2]
-			}
+	// 		// When the endpoint pattern is matched used the first sub match as the endpoint label.
+	// 		matches := endpointPattern.FindStringSubmatch(endpoint)
+	// 		if len(matches) == 3 {
+	// 			label = matches[1]
+	// 			url = matches[2]
+	// 		}
 
-			builder.WriteString(fmt.Sprintf("%s- %s: %s\n", currentIndentation, label, output.WithLinkFormat(url)))
-		}
-	}
+	// 		builder.WriteString(fmt.Sprintf("%s- %s: %s\n", currentIndentation, label, output.WithLinkFormat(url)))
+	// 	}
+	// }
 
 	return builder.String()
 }

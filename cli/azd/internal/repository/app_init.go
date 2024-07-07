@@ -152,9 +152,8 @@ func (i *Initializer) InitFromApp(
 		detect := detectConfirmAppHost{console: i.console}
 		detect.Init(appHost, wd)
 
-		
-
-		if targetService, err := detect.Confirm(ctx); err != nil {
+		targetService, err := detect.Confirm(ctx)
+		if err != nil {
 			return targetService, err
 		}
 
@@ -163,14 +162,14 @@ func (i *Initializer) InitFromApp(
 		// Prompt for environment before proceeding with generation
 		newEnv, err := initializeEnv()
 		if err != nil {
-			return "", err
+			return targetService, err
 		}
 		envManager, err := i.lazyEnvManager.GetValue()
 		if err != nil {
-			return "", err
+			return targetService, err
 		}
 		if err := envManager.Save(ctx, newEnv); err != nil {
-			return "", err
+			return targetService, err
 		}
 
 		i.console.Message(ctx, "\n"+output.WithBold("Generating files to run your app on Azure:")+"\n")
@@ -181,30 +180,31 @@ func (i *Initializer) InitFromApp(
 			filepath.Base(azdCtx.ProjectDirectory()),
 			appHostManifests[appHost.Path],
 			appHost.Path,
+			string(targetService),
 		)
 		if err != nil {
-			return "", err
+			return targetService, err
 		}
 
 		staging, err := os.MkdirTemp("", "azd-infra")
 		if err != nil {
-			return "",fmt.Errorf("mkdir temp: %w", err)
+			return targetService, fmt.Errorf("mkdir temp: %w", err)
 		}
 
 		defer func() { _ = os.RemoveAll(staging) }()
 		for path, file := range files {
 			if err := os.MkdirAll(filepath.Join(staging, filepath.Dir(path)), osutil.PermissionDirectory); err != nil {
-				return "", err
+				return targetService, err
 			}
 
 			if err := os.WriteFile(filepath.Join(staging, path), []byte(file.Contents), file.Mode); err != nil {
-				return "", err
+				return targetService, err
 			}
 		}
 
 		skipStagingFiles, err := i.promptForDuplicates(ctx, staging, azdCtx.ProjectDirectory())
 		if err != nil {
-			return "", err
+			return targetService, err
 		}
 
 		options := copy.Options{}
@@ -237,7 +237,7 @@ func (i *Initializer) InitFromApp(
 	// Confirm selection of services and databases
 	err := detect.Confirm(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	tracing.SetUsageAttributes(fields.AppInitLastStep.String("config"))
@@ -245,13 +245,13 @@ func (i *Initializer) InitFromApp(
 	// Create the infra spec
 	spec, err := i.infraSpecFromDetect(ctx, detect)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Prompt for environment before proceeding with generation
 	_, err = initializeEnv()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	tracing.SetUsageAttributes(fields.AppInitLastStep.String("generate"))
@@ -259,7 +259,7 @@ func (i *Initializer) InitFromApp(
 	i.console.Message(ctx, "\n"+output.WithBold("Generating files to run your app on Azure:")+"\n")
 	err = i.genProjectFile(ctx, azdCtx, detect)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	infra := filepath.Join(azdCtx.ProjectDirectory(), "infra")
@@ -269,27 +269,27 @@ func (i *Initializer) InitFromApp(
 
 	staging, err := os.MkdirTemp("", "azd-infra")
 	if err != nil {
-		return fmt.Errorf("mkdir temp: %w", err)
+		return "", fmt.Errorf("mkdir temp: %w", err)
 	}
 
 	defer func() { _ = os.RemoveAll(staging) }()
 	t, err := scaffold.Load()
 	if err != nil {
-		return fmt.Errorf("loading scaffold templates: %w", err)
+		return "", fmt.Errorf("loading scaffold templates: %w", err)
 	}
 
 	err = scaffold.ExecInfra(t, spec, staging)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err := os.MkdirAll(infra, osutil.PermissionDirectory); err != nil {
-		return err
+		return "", err
 	}
 
 	skipStagingFiles, err := i.promptForDuplicates(ctx, staging, infra)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	options := copy.Options{}
@@ -301,19 +301,19 @@ func (i *Initializer) InitFromApp(
 	}
 
 	if err := copy.Copy(staging, infra, options); err != nil {
-		return fmt.Errorf("copying contents from temp staging directory: %w", err)
+		return "", fmt.Errorf("copying contents from temp staging directory: %w", err)
 	}
 
 	err = scaffold.Execute(t, "next-steps.md", spec, filepath.Join(azdCtx.ProjectDirectory(), "next-steps.md"))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	i.console.MessageUxItem(ctx, &ux.DoneMessage{
 		Message: "Generating " + output.WithHighLightFormat("./next-steps.md"),
 	})
 
-	return targetService ,nil
+	return "", nil
 }
 
 func (i *Initializer) genProjectFile(

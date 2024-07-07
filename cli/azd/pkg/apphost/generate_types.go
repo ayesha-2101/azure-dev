@@ -196,8 +196,9 @@ type genContainerAppManifestTemplateContext struct {
 }
 
 type genProjectFileContext struct {
-	Name     string
-	Services map[string]string
+	Name          string
+	Services      map[string]string
+	TargetService string
 }
 
 type genContainerAppManifestTemplateContextDapr struct {
