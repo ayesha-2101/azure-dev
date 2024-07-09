@@ -76,7 +76,7 @@ func (s *environmentService) CreateEnvironmentAsync(
 			projectName,
 			manifest,
 			rc.HostProjectPath,
-			"containerapp",
+			"containerapp", //container environment specific
 		)
 		if err != nil {
 			return false, fmt.Errorf("generating project artifacts: %w", err)

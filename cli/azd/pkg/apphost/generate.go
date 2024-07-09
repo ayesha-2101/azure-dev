@@ -390,7 +390,7 @@ func GenerateProjectArtifacts(
 		return nil, fmt.Errorf("generating azure.yaml: %w", err)
 	}
 
-	if err := executeToFS(generatedFS, genTemplates, "next-steps.md", "next-steps.md", nil); err != nil {
+	if err := executeToFS(generatedFS, genTemplates, "next-steps.md", "next-steps.md", projectFileContext); err != nil {
 		return nil, fmt.Errorf("generating next-steps.md: %w", err)
 	}
 
