@@ -381,10 +381,9 @@ func GenerateProjectArtifacts(
 
 	projectFileContext := genProjectFileContext{
 		Name: projectName,
-		Services: map[string]string{
-			"app": fmt.Sprintf(".%s%s", string(filepath.Separator), appHostRel),
+		Services: map[string]service{
+			"app": service{Project: fmt.Sprintf(".%s%s", string(filepath.Separator), appHostRel), Host: targetService},
 		},
-		TargetService: targetService,
 	}
 
 	if err := executeToFS(generatedFS, genTemplates, "azure.yaml", "azure.yaml", projectFileContext); err != nil {

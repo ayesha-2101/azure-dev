@@ -7,8 +7,8 @@ services:
 {{- range $name, $value := .Services}}  
   {{$name}}:
     language: dotnet
-    project: {{$value}}
-    host: appservice
+    project: {{$value.Project}}
+    host: {{$value.Host}}
 {{- end}}
 {{- end}}
 {{ end}}
