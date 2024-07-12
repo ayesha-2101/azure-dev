@@ -182,6 +182,7 @@ func BuildContainers(manifest *Manifest) (map[string]genBuildContainer, error) {
 
 type AppHostOptions struct {
 	AzdOperations bool
+	TargetService string
 }
 
 // ContainerAppManifestTemplateForProject returns the container app manifest template for a given project.
@@ -261,6 +262,7 @@ func BicepTemplate(name string, manifest *Manifest, options AppHostOptions) (*me
 		genBicepTemplateContext
 		WithMetadataParameters []autoGenInput
 		MainToResourcesParams  []genInput
+		TargetService          string
 	}
 	var parameters []autoGenInput
 	var mapToResourceParams []genInput
@@ -292,7 +294,11 @@ func BicepTemplate(name string, manifest *Manifest, options AppHostOptions) (*me
 		genBicepTemplateContext: generator.bicepContext,
 		WithMetadataParameters:  parameters,
 		MainToResourcesParams:   mapToResourceParams,
+		TargetService:           options.TargetService,
 	}
+
+	//you can check the value of context.TargetService here
+
 	if err := executeToFS(fs, genTemplates, "main.bicep", name+".bicep", context); err != nil {
 		return nil, fmt.Errorf("generating infra/main.bicep: %w", err)
 	}
@@ -394,6 +400,13 @@ func GenerateProjectArtifacts(
 		return nil, fmt.Errorf("generating next-steps.md: %w", err)
 	}
 
+	callBicepTemplate := func() (*memfs.FS, error) {
+		return BicepTemplate(projectName, manifest, AppHostOptions{
+			TargetService: targetService,
+		})
+	}
+
+	_, err = callBicepTemplate()
 	files := make(map[string]ContentsAndMode)
 
 	err = fs.WalkDir(generatedFS, ".", func(path string, d fs.DirEntry, err error) error {
